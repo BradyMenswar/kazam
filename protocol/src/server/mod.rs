@@ -1,7 +1,7 @@
 mod tests;
 
-use anyhow::Result;
 use crate::ParseError;
+use anyhow::Result;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ServerMessage {
@@ -16,7 +16,7 @@ pub struct ServerFrame {
 }
 
 /// Parse a complete WebSocket frame into structured messages
-pub fn parse_server_frame(frame: &str) -> anyhow::Result<ServerFrame> {
+pub fn parse_server_frame(frame: &str) -> Result<ServerFrame> {
     let mut lines = frame.lines();
     let mut room_id = None;
 
