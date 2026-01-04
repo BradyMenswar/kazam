@@ -1,0 +1,9 @@
+[package]
+name = "kazam-client"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+kazam-protocol = { path = "../protocol" }
+tokio.workspace = true
+
