@@ -3,7 +3,8 @@ use thiserror::Error;
 pub mod client;
 pub mod server;
 
-pub use server::{ServerMessage, parse_server_message};
+pub use client::{ClientCommand, ClientMessage};
+pub use server::{ServerFrame, ServerMessage, parse_server_frame, parse_server_message};
 
 #[derive(Error, Debug)]
 pub enum ParseError {
