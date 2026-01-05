@@ -77,4 +77,9 @@ impl Connection {
     pub async fn recv(&mut self) -> Option<Result<ServerFrame>> {
         self.incoming.recv().await
     }
+
+    /// Split the connection into its incoming and outgoing channels
+    pub fn split(self) -> (mpsc::Receiver<Result<ServerFrame>>, mpsc::Sender<String>) {
+        (self.incoming, self.outgoing)
+    }
 }
