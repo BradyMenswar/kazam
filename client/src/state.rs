@@ -1,7 +1,3 @@
-use std::collections::HashMap;
-
-use crate::room::{RoomId, RoomState};
-
 /// Information about the currently logged-in user
 #[derive(Debug, Clone)]
 pub struct UserInfo {
@@ -14,7 +10,6 @@ pub struct UserInfo {
 pub(crate) struct ClientState {
     pub challstr: Option<String>,
     pub user: Option<UserInfo>,
-    pub rooms: HashMap<RoomId, RoomState>,
 }
 
 impl ClientState {
@@ -22,7 +17,6 @@ impl ClientState {
         Self {
             challstr: None,
             user: None,
-            rooms: HashMap::new(),
         }
     }
 }

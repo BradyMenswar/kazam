@@ -65,19 +65,6 @@ impl Connection {
         }
     }
 
-    /// Send a message to the server
-    pub async fn send(&self, message: String) -> Result<()> {
-        self.outgoing
-            .send(message)
-            .await
-            .map_err(|_| anyhow::anyhow!("Connection closed"))
-    }
-
-    /// Receive the next frame from the server
-    pub async fn recv(&mut self) -> Option<Result<ServerFrame>> {
-        self.incoming.recv().await
-    }
-
     /// Split the connection into its incoming and outgoing channels
     pub fn split(self) -> (mpsc::Receiver<Result<ServerFrame>>, mpsc::Sender<String>) {
         (self.incoming, self.outgoing)
