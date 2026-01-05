@@ -1,5 +1,3 @@
-mod tests;
-
 use crate::ParseError;
 use anyhow::Result;
 

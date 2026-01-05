@@ -33,7 +33,7 @@ impl ClientCommand {
             Self::TrustedLogin {
                 username,
                 assertion,
-            } => format!("/trn {},{}", username, assertion),
+            } => format!("/trn {},0,{}", username, assertion),
             Self::JoinRoom(room) => format!("/join {}", room),
             Self::LeaveRoom(room) => format!("/leave {}", room),
             Self::Challenge { username, format } => format!("/challenge {}, {}", username, format),
