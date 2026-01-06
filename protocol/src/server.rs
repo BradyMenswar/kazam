@@ -16,6 +16,13 @@ pub enum ServerMessage {
     /// |nametaken|USERNAME|MESSAGE
     NameTaken { username: String, message: String },
 
+    /// |join|USER, |j|USER, or |J|USER
+    Join {
+        username: String,
+        quiet: bool,
+        away: bool,
+    },
+
     /// Raw message for catch-all
     Raw(String),
 }
@@ -71,6 +78,8 @@ pub fn parse_server_message(line: &str) -> Result<ServerMessage> {
         "challstr" => parse_challstr(&parts),
         "updateuser" => parse_updateuser(&parts),
         "nametaken" => parse_nametaken(&parts),
+        "join" | "j" => parse_join(&parts, false),
+        "J" => parse_join(&parts, true),
         _ => Ok(ServerMessage::Raw(line.to_string())),
     }
 }
@@ -115,5 +124,21 @@ fn parse_nametaken(parts: &[&str]) -> Result<ServerMessage> {
     Ok(ServerMessage::NameTaken {
         username: parts[2].to_string(),
         message: parts[3..].join("|"),
+    })
+}
+
+fn parse_join(parts: &[&str], quiet: bool) -> Result<ServerMessage> {
+    if parts.len() < 3 {
+        return Err(ParseError::MissingField("join fields".to_string()).into());
+    }
+
+    let user_str = parts[2];
+    let username = user_str.trim_start_matches(|c: char| !c.is_alphanumeric());
+    let away = parts[2].ends_with("@!");
+
+    Ok(ServerMessage::Join {
+        username: username.to_string(),
+        quiet,
+        away,
     })
 }

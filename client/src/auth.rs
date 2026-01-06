@@ -1,9 +1,27 @@
 use anyhow::{Result, anyhow};
+use kazam_protocol::{ClientCommand, ClientMessage};
+
+use crate::KazamClient;
 
 const LOGIN_URL: &str = "https://play.pokemonshowdown.com/api/login";
 
-/// Get an assertion token from the Pokemon Showdown login server
-pub async fn get_assertion(username: &str, password: &str, challstr: &str) -> Result<String> {
+impl KazamClient {
+    pub async fn login(&mut self, username: &str, password: &str, challstr: &str) -> Result<()> {
+        let assertion = get_assertion(username, password, challstr).await?;
+
+        let cmd = ClientMessage {
+            room_id: Some(String::new()),
+            command: ClientCommand::TrustedLogin {
+                username: username.to_string(),
+                assertion,
+            },
+        };
+
+        self.send_raw(cmd.to_wire_format()).await
+    }
+}
+
+async fn get_assertion(username: &str, password: &str, challstr: &str) -> Result<String> {
     let client = reqwest::Client::new();
 
     let params = [

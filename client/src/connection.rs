@@ -1,72 +1,136 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use futures_util::{SinkExt, StreamExt};
 use kazam_protocol::{ServerFrame, parse_server_frame};
-use tokio::sync::mpsc;
-use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
+use std::time::Duration;
 
-const CHANNEL_BUFFER_SIZE: usize = 64;
+use tokio::net::TcpStream;
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
+
+pub struct ReconnectPolicy {
+    pub max_attempts: Option<usize>,
+    pub initial_delay: Duration,
+    pub max_delay: Duration,
+    pub backoff_multiplier: f64,
+}
+
+impl Default for ReconnectPolicy {
+    fn default() -> Self {
+        Self {
+            max_attempts: Some(5),
+            initial_delay: Duration::from_secs(1),
+            max_delay: Duration::from_secs(30),
+            backoff_multiplier: 2.0,
+        }
+    }
+}
 
 pub struct Connection {
-    incoming: mpsc::Receiver<Result<ServerFrame>>,
-    outgoing: mpsc::Sender<String>,
+    ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    url: String,
+    reconnect_policy: ReconnectPolicy,
 }
 
 impl Connection {
-    /// Connect to a WebSocket server
-    pub async fn connect(url: &str) -> Result<Self> {
-        let (ws_stream, _) = connect_async(url).await?;
-        let (write, read) = ws_stream.split();
-
-        let (incoming_tx, incoming_rx) = mpsc::channel(CHANNEL_BUFFER_SIZE);
-        let (outgoing_tx, outgoing_rx) = mpsc::channel(CHANNEL_BUFFER_SIZE);
-
-        tokio::spawn(Self::read_task(read, incoming_tx));
-        tokio::spawn(Self::write_task(write, outgoing_rx));
+    pub async fn connect(url: String, policy: ReconnectPolicy) -> Result<Self> {
+        let ws_stream = Self::establish_connection(&url)
+            .await
+            .with_context(|| format!("Failed to connect to {}", url))?;
 
         Ok(Self {
-            incoming: incoming_rx,
-            outgoing: outgoing_tx,
+            ws_stream,
+            url,
+            reconnect_policy: policy,
         })
     }
 
-    /// Read task - reads from WebSocket and sends to incoming channel
-    async fn read_task<S>(mut read: S, tx: mpsc::Sender<Result<ServerFrame>>)
-    where
-        S: StreamExt<Item = Result<WsMessage, tokio_tungstenite::tungstenite::Error>> + Unpin,
-    {
-        while let Some(msg_result) = read.next().await {
-            let result = match msg_result {
-                Ok(WsMessage::Text(text)) => match parse_server_frame(&text) {
-                    Ok(frame) => Ok(frame),
-                    Err(e) => Err(e),
-                },
-                Ok(WsMessage::Close(_)) => break,
-                Ok(_) => continue, // Ignore ping/pong/binary
-                Err(e) => Err(e.into()),
-            };
+    async fn establish_connection(url: &str) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
+        let (ws_stream, _) = connect_async(url)
+            .await
+            .with_context(|| "WebSocket handshake failed")?;
+        Ok(ws_stream)
+    }
 
-            if tx.send(result).await.is_err() {
-                // Receiver dropped, exit
-                break;
+    async fn reconnect(&mut self) -> Result<()> {
+        let mut delay = self.reconnect_policy.initial_delay;
+        let mut attempt = 1;
+
+        loop {
+            if let Some(max) = self.reconnect_policy.max_attempts {
+                if attempt > max {
+                    anyhow::bail!(
+                        "Failed to reconnect after {} attempts to {}",
+                        max,
+                        self.url
+                    );
+                }
+            }
+
+            tokio::time::sleep(delay).await;
+
+            match Self::establish_connection(&self.url).await {
+                Ok(ws_stream) => {
+                    self.ws_stream = ws_stream;
+                    return Ok(());
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        attempt = attempt,
+                        max_attempts = ?self.reconnect_policy.max_attempts,
+                        error = %e,
+                        "Reconnection attempt failed"
+                    );
+                    attempt += 1;
+                    delay = Duration::from_secs_f64(
+                        delay.as_secs_f64() * self.reconnect_policy.backoff_multiplier
+                    ).min(self.reconnect_policy.max_delay);
+                }
             }
         }
     }
 
-    /// Write task - reads from outgoing channel and writes to WebSocket
-    async fn write_task<S>(mut write: S, mut rx: mpsc::Receiver<String>)
-    where
-        S: SinkExt<WsMessage> + Unpin,
-        S::Error: std::fmt::Debug,
-    {
-        while let Some(msg) = rx.recv().await {
-            if write.send(WsMessage::Text(msg.into())).await.is_err() {
-                break;
+    pub async fn recv(&mut self) -> Result<ServerFrame> {
+        loop {
+            match self.ws_stream.next().await {
+                Some(Ok(Message::Text(text))) => {
+                    return parse_server_frame(&text)
+                        .context("Failed to parse server frame");
+                }
+                Some(Ok(Message::Ping(data))) => {
+                    self.ws_stream
+                        .send(Message::Pong(data))
+                        .await
+                        .context("Failed to send pong")?;
+                }
+                Some(Ok(Message::Pong(_))) => continue,
+                Some(Ok(Message::Close(_))) | None => {
+                    self.reconnect()
+                        .await
+                        .context("Connection lost and reconnection failed")?;
+                }
+                Some(Ok(_)) => continue,
+                Some(Err(e)) => {
+                    tracing::error!(error = %e, "WebSocket error, attempting reconnect");
+                    self.reconnect()
+                        .await
+                        .context("WebSocket error and reconnection failed")?;
+                }
             }
         }
     }
 
-    /// Split the connection into its incoming and outgoing channels
-    pub fn split(self) -> (mpsc::Receiver<Result<ServerFrame>>, mpsc::Sender<String>) {
-        (self.incoming, self.outgoing)
+    pub async fn send(&mut self, message: String) -> Result<()> {
+        self.ws_stream
+            .send(Message::Text(message))
+            .await
+            .context("Failed to send message")?;
+        Ok(())
+    }
+
+    pub async fn close(&mut self) -> Result<()> {
+        self.ws_stream
+            .close(None)
+            .await
+            .context("Failed to close connection")?;
+        Ok(())
     }
 }
