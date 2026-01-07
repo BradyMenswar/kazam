@@ -57,11 +57,7 @@ impl Connection {
         loop {
             if let Some(max) = self.reconnect_policy.max_attempts {
                 if attempt > max {
-                    anyhow::bail!(
-                        "Failed to reconnect after {} attempts to {}",
-                        max,
-                        self.url
-                    );
+                    anyhow::bail!("Failed to reconnect after {} attempts to {}", max, self.url);
                 }
             }
 
@@ -81,8 +77,9 @@ impl Connection {
                     );
                     attempt += 1;
                     delay = Duration::from_secs_f64(
-                        delay.as_secs_f64() * self.reconnect_policy.backoff_multiplier
-                    ).min(self.reconnect_policy.max_delay);
+                        delay.as_secs_f64() * self.reconnect_policy.backoff_multiplier,
+                    )
+                    .min(self.reconnect_policy.max_delay);
                 }
             }
         }
@@ -92,8 +89,7 @@ impl Connection {
         loop {
             match self.ws_stream.next().await {
                 Some(Ok(Message::Text(text))) => {
-                    return parse_server_frame(&text)
-                        .context("Failed to parse server frame");
+                    return parse_server_frame(&text).context("Failed to parse server frame");
                 }
                 Some(Ok(Message::Ping(data))) => {
                     self.ws_stream
@@ -123,14 +119,6 @@ impl Connection {
             .send(Message::Text(message))
             .await
             .context("Failed to send message")?;
-        Ok(())
-    }
-
-    pub async fn close(&mut self) -> Result<()> {
-        self.ws_stream
-            .close(None)
-            .await
-            .context("Failed to close connection")?;
         Ok(())
     }
 }

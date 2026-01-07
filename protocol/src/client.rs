@@ -19,6 +19,21 @@ pub enum ClientCommand {
     /// /search FORMAT
     Search(String),
 
+    /// /cancelsearch
+    CancelSearch,
+
+    /// /choose CHOICE|RQID - battle decision
+    Choose { choice: String, rqid: Option<u64> },
+
+    /// /undo - undo battle decision
+    Undo,
+
+    /// /forfeit - forfeit the battle
+    Forfeit,
+
+    /// /timer on|off
+    Timer(bool),
+
     /// Raw chat message
     Chat(String),
 
@@ -39,6 +54,17 @@ impl ClientCommand {
             Self::Challenge { username, format } => format!("/challenge {}, {}", username, format),
             Self::UpdateTeam(team) => format!("/utm {}", team),
             Self::Search(format) => format!("/search {}", format),
+            Self::CancelSearch => "/cancelsearch".to_string(),
+            Self::Choose { choice, rqid } => {
+                if let Some(id) = rqid {
+                    format!("/choose {}|{}", choice, id)
+                } else {
+                    format!("/choose {}", choice)
+                }
+            }
+            Self::Undo => "/undo".to_string(),
+            Self::Forfeit => "/forfeit".to_string(),
+            Self::Timer(on) => format!("/timer {}", if *on { "on" } else { "off" }),
             Self::Chat(message) => message.clone(),
             Self::Raw(command) => command.clone(),
         }
