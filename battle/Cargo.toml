@@ -1,0 +1,16 @@
+[package]
+name = "kazam-battle"
+version.workspace = true
+edition.workspace = true
+description = "Battle state tracking and domain types for Pokemon Showdown"
+
+[features]
+default = []
+serde = ["dep:serde"]
+
+[dependencies]
+kazam-protocol = { path = "../protocol" }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

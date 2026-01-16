@@ -87,7 +87,6 @@ impl RandomBattleBot {
 impl KazamHandler for RandomBattleBot {
     async fn on_challstr(&mut self, challstr: &str) {
         println!("Logging in...");
-        // NOTE: Replace with your own credentials
         self.handle
             .login("bmax117", "dragon117", challstr)
             .await

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "protocol",
+    "battle",
     "client"
 ]
 resolver = "2"

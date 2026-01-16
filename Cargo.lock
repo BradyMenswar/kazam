@@ -488,11 +488,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "kazam-battle"
+version = "0.1.0"
+dependencies = [
+ "kazam-protocol",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "kazam-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "futures-util",
+ "kazam-battle",
  "kazam-protocol",
  "rand 0.8.5",
  "reqwest",
