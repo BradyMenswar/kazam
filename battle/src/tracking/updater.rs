@@ -158,15 +158,12 @@ impl TrackedBattle {
 
             ServerMessage::ClearAllBoost => {
                 // Clear boosts for all active Pokemon
-                for side in &mut self.sides {
-                    if let Some(side) = side {
-                        for idx in &side.active_indices {
-                            if let Some(idx) = idx {
-                                if let Some(poke) = side.pokemon.get_mut(*idx) {
-                                    poke.boosts.clear();
-                                }
+                for side in self.sides.iter_mut().flatten() {
+                    for idx in &side.active_indices {
+                        if let Some(idx) = idx
+                            && let Some(poke) = side.pokemon.get_mut(*idx) {
+                                poke.boosts.clear();
                             }
-                        }
                     }
                 }
             }
@@ -266,19 +263,17 @@ impl TrackedBattle {
 
             // === Side Conditions ===
             ServerMessage::SideStart { side, condition } => {
-                if let Some(side_state) = self.get_side_mut(side.player) {
-                    if let Some(cond) = SideCondition::from_protocol(condition) {
+                if let Some(side_state) = self.get_side_mut(side.player)
+                    && let Some(cond) = SideCondition::from_protocol(condition) {
                         side_state.add_condition(cond);
                     }
-                }
             }
 
             ServerMessage::SideEnd { side, condition } => {
-                if let Some(side_state) = self.get_side_mut(side.player) {
-                    if let Some(cond) = SideCondition::from_protocol(condition) {
+                if let Some(side_state) = self.get_side_mut(side.player)
+                    && let Some(cond) = SideCondition::from_protocol(condition) {
                         side_state.remove_condition(cond);
                     }
-                }
             }
 
             ServerMessage::SwapSideConditions => {
@@ -449,11 +444,10 @@ impl TrackedBattle {
                         poke.identity.shiny = details.shiny;
 
                         // Parse nickname from ident
-                        if let Some(name) = req_poke.ident.split(": ").nth(1) {
-                            if name != poke.identity.species {
+                        if let Some(name) = req_poke.ident.split(": ").nth(1)
+                            && name != poke.identity.species {
                                 poke.identity.nickname = Some(name.to_string());
                             }
-                        }
 
                         // Full info from request
                         poke.known_moves = req_poke.moves.clone();
@@ -560,11 +554,10 @@ impl TrackedBattle {
         }
 
         // Clear from active slot
-        if let Some(side) = self.get_side_mut(pokemon.player) {
-            if let Some(slot) = pokemon.position.map(position_to_slot) {
+        if let Some(side) = self.get_side_mut(pokemon.player)
+            && let Some(slot) = pokemon.position.map(position_to_slot) {
                 side.active_indices[slot] = None;
             }
-        }
     }
 
     /// Find a Pokemon by protocol identifier (immutable)

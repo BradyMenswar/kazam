@@ -55,11 +55,10 @@ impl Connection {
         let mut attempt = 1;
 
         loop {
-            if let Some(max) = self.reconnect_policy.max_attempts {
-                if attempt > max {
+            if let Some(max) = self.reconnect_policy.max_attempts
+                && attempt > max {
                     anyhow::bail!("Failed to reconnect after {} attempts to {}", max, self.url);
                 }
-            }
 
             tokio::time::sleep(delay).await;
 

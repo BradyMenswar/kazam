@@ -2,6 +2,11 @@
 name = "kazam-protocol"
 version.workspace = true
 edition.workspace = true
+description = "Protocol types and message parsing for Pokemon Showdown websocket API"
+license = "MIT"
+repository = "https://github.com/BradyMenswar/kazam"
+keywords = ["pokemon", "showdown", "protocol", "websocket", "parser"]
+categories = ["parsing", "network-programming"]
 
 [dependencies]
 anyhow.workspace = true

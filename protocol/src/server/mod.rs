@@ -582,12 +582,11 @@ pub fn parse_server_frame(frame: &str) -> Result<ServerFrame> {
     let mut room_id = None;
 
     // Check if first line is >ROOMID
-    if let Some(first_line) = lines.clone().next() {
-        if let Some(room) = first_line.strip_prefix('>') {
+    if let Some(first_line) = lines.clone().next()
+        && let Some(room) = first_line.strip_prefix('>') {
             room_id = Some(room.to_string());
             lines.next();
         }
-    }
 
     // Parse remaining lines as messages
     let messages: Vec<ServerMessage> = lines

@@ -210,7 +210,7 @@ pub fn parse_copyboost(parts: &[&str]) -> Result<ServerMessage> {
 /// Parse |-weather|WEATHER
 pub fn parse_weather(parts: &[&str]) -> Result<ServerMessage> {
     let weather = parts.get(2).unwrap_or(&"none").to_string();
-    let upkeep = parts.iter().any(|p| *p == "[upkeep]");
+    let upkeep = parts.contains(&"[upkeep]");
 
     Ok(ServerMessage::Weather { weather, upkeep })
 }
@@ -312,7 +312,7 @@ pub fn parse_enditem(parts: &[&str]) -> Result<ServerMessage> {
     let from = parts
         .iter()
         .find_map(|p| p.strip_prefix("[from] ").map(|s| s.to_string()));
-    let eat = parts.iter().any(|p| *p == "[eat]");
+    let eat = parts.contains(&"[eat]");
 
     Ok(ServerMessage::EndItem {
         pokemon,

@@ -2,7 +2,11 @@
 name = "kazam-battle"
 version.workspace = true
 edition.workspace = true
-description = "Battle state tracking and domain types for Pokemon Showdown"
+description = "Battle state tracking and domain types for Pokemon Showdown (experimental)"
+license = "MIT"
+repository = "https://github.com/BradyMenswar/kazam"
+keywords = ["pokemon", "showdown", "battle", "state", "game"]
+categories = ["game-development", "data-structures"]
 
 [features]
 default = []

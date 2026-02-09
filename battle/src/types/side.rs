@@ -171,20 +171,18 @@ impl SideState {
     pub fn set_active(&mut self, slot: usize, pokemon_index: Option<usize>) {
         if slot < self.active_indices.len() {
             // Switch out old active Pokemon if any
-            if let Some(old_idx) = self.active_indices[slot] {
-                if let Some(old_poke) = self.pokemon.get_mut(old_idx) {
+            if let Some(old_idx) = self.active_indices[slot]
+                && let Some(old_poke) = self.pokemon.get_mut(old_idx) {
                     old_poke.on_switch_out();
                 }
-            }
 
             self.active_indices[slot] = pokemon_index;
 
             // Switch in new Pokemon
-            if let Some(idx) = pokemon_index {
-                if let Some(new_poke) = self.pokemon.get_mut(idx) {
+            if let Some(idx) = pokemon_index
+                && let Some(new_poke) = self.pokemon.get_mut(idx) {
                     new_poke.on_switch_in();
                 }
-            }
         }
     }
 

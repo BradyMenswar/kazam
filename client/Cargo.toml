@@ -2,6 +2,11 @@
 name = "kazam-client"
 version.workspace = true
 edition.workspace = true
+description = "Async websocket client for Pokemon Showdown with event-driven handler interface"
+license = "MIT"
+repository = "https://github.com/BradyMenswar/kazam"
+keywords = ["pokemon", "showdown", "client", "websocket", "async"]
+categories = ["network-programming", "asynchronous", "api-bindings"]
 
 [dependencies]
 kazam-protocol = { path = "../protocol" }

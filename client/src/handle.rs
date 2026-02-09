@@ -174,8 +174,8 @@ async fn get_assertion(username: &str, password: &str, challstr: &str) -> Result
     let json: serde_json::Value = serde_json::from_str(json_str)?;
 
     if let Some(assertion) = json.get("assertion").and_then(|v| v.as_str()) {
-        if assertion.starts_with(";;") {
-            return Err(anyhow!("Login failed: {}", &assertion[2..]));
+        if let Some(error_msg) = assertion.strip_prefix(";;") {
+            return Err(anyhow!("Login failed: {}", error_msg));
         }
         Ok(assertion.to_string())
     } else {

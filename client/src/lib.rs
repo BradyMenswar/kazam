@@ -147,11 +147,10 @@ impl KazamClient {
 
                 ServerMessage::Title(title) => {
                     if let Some(ref rid) = room_id {
-                        if let Ok(mut rooms) = self.state.rooms.write() {
-                            if let Some(room) = rooms.get_mut(rid) {
+                        if let Ok(mut rooms) = self.state.rooms.write()
+                            && let Some(room) = rooms.get_mut(rid) {
                                 room.title = Some(title.clone());
                             }
-                        }
                         handler.on_title(rid, &title).await;
                     }
                 }
@@ -178,26 +177,21 @@ impl KazamClient {
                 }
 
                 ServerMessage::Join { user, quiet } => {
-                    if let Some(ref rid) = room_id {
-                        if let Ok(mut rooms) = self.state.rooms.write() {
-                            if let Some(room) = rooms.get_mut(rid) {
-                                if !room.users.iter().any(|u| u.username == user.username) {
+                    if let Some(ref rid) = room_id
+                        && let Ok(mut rooms) = self.state.rooms.write()
+                            && let Some(room) = rooms.get_mut(rid)
+                                && !room.users.iter().any(|u| u.username == user.username) {
                                     room.users.push(user.clone());
                                 }
-                            }
-                        }
-                    }
                     handler.on_join(room_id.as_deref(), &user, quiet).await;
                 }
 
                 ServerMessage::Leave { user, quiet } => {
-                    if let Some(ref rid) = room_id {
-                        if let Ok(mut rooms) = self.state.rooms.write() {
-                            if let Some(room) = rooms.get_mut(rid) {
+                    if let Some(ref rid) = room_id
+                        && let Ok(mut rooms) = self.state.rooms.write()
+                            && let Some(room) = rooms.get_mut(rid) {
                                 room.users.retain(|u| u.username != user.username);
                             }
-                        }
-                    }
                     handler.on_leave(room_id.as_deref(), &user, quiet).await;
                 }
 
@@ -238,9 +232,9 @@ impl KazamClient {
                     old_id,
                     quiet,
                 } => {
-                    if let Some(ref rid) = room_id {
-                        if let Ok(mut rooms) = self.state.rooms.write() {
-                            if let Some(room) = rooms.get_mut(rid) {
+                    if let Some(ref rid) = room_id
+                        && let Ok(mut rooms) = self.state.rooms.write()
+                            && let Some(room) = rooms.get_mut(rid) {
                                 // Update user in room's user list
                                 if let Some(existing) = room
                                     .users
@@ -250,8 +244,6 @@ impl KazamClient {
                                     *existing = user.clone();
                                 }
                             }
-                        }
-                    }
                     handler
                         .on_name(room_id.as_deref(), &user, &old_id, quiet)
                         .await;
@@ -284,8 +276,8 @@ impl KazamClient {
                     avatar,
                     rating,
                 } => {
-                    if let Some(ref rid) = room_id {
-                        if let Ok(mut battles) = self.state.battles.write() {
+                    if let Some(ref rid) = room_id
+                        && let Ok(mut battles) = self.state.battles.write() {
                             let battle = battles.entry(rid.clone()).or_insert_with(BattleInfo::new);
                             battle.players.push(PlayerInfo {
                                 player,
@@ -295,7 +287,6 @@ impl KazamClient {
                                 team_size: 0,
                             });
                         }
-                    }
                     handler
                         .on_battle_message(room_id.as_deref(), ServerMessage::BattlePlayer {
                             player,
@@ -307,81 +298,68 @@ impl KazamClient {
                 }
 
                 ServerMessage::TeamSize { player, size } => {
-                    if let Some(ref rid) = room_id {
-                        if let Ok(mut battles) = self.state.battles.write() {
-                            if let Some(battle) = battles.get_mut(rid) {
-                                if let Some(p) = battle.players.iter_mut().find(|p| p.player == player) {
+                    if let Some(ref rid) = room_id
+                        && let Ok(mut battles) = self.state.battles.write()
+                            && let Some(battle) = battles.get_mut(rid)
+                                && let Some(p) = battle.players.iter_mut().find(|p| p.player == player) {
                                     p.team_size = size;
                                 }
-                            }
-                        }
-                    }
                     handler
                         .on_battle_message(room_id.as_deref(), ServerMessage::TeamSize { player, size })
                         .await;
                 }
 
                 ServerMessage::GameType(game_type) => {
-                    if let Some(ref rid) = room_id {
-                        if let Ok(mut battles) = self.state.battles.write() {
-                            if let Some(battle) = battles.get_mut(rid) {
+                    if let Some(ref rid) = room_id
+                        && let Ok(mut battles) = self.state.battles.write()
+                            && let Some(battle) = battles.get_mut(rid) {
                                 battle.game_type = Some(game_type);
                             }
-                        }
-                    }
                     handler
                         .on_battle_message(room_id.as_deref(), ServerMessage::GameType(game_type))
                         .await;
                 }
 
                 ServerMessage::Gen(generation) => {
-                    if let Some(ref rid) = room_id {
-                        if let Ok(mut battles) = self.state.battles.write() {
-                            if let Some(battle) = battles.get_mut(rid) {
+                    if let Some(ref rid) = room_id
+                        && let Ok(mut battles) = self.state.battles.write()
+                            && let Some(battle) = battles.get_mut(rid) {
                                 battle.generation = generation;
                             }
-                        }
-                    }
                     handler
                         .on_battle_message(room_id.as_deref(), ServerMessage::Gen(generation))
                         .await;
                 }
 
                 ServerMessage::Tier(tier) => {
-                    if let Some(ref rid) = room_id {
-                        if let Ok(mut battles) = self.state.battles.write() {
-                            if let Some(battle) = battles.get_mut(rid) {
+                    if let Some(ref rid) = room_id
+                        && let Ok(mut battles) = self.state.battles.write()
+                            && let Some(battle) = battles.get_mut(rid) {
                                 battle.tier = tier.clone();
                             }
-                        }
-                    }
                     handler
                         .on_battle_message(room_id.as_deref(), ServerMessage::Tier(tier))
                         .await;
                 }
 
                 ServerMessage::Rated(message) => {
-                    if let Some(ref rid) = room_id {
-                        if let Ok(mut battles) = self.state.battles.write() {
-                            if let Some(battle) = battles.get_mut(rid) {
+                    if let Some(ref rid) = room_id
+                        && let Ok(mut battles) = self.state.battles.write()
+                            && let Some(battle) = battles.get_mut(rid) {
                                 battle.rated = true;
                                 battle.rated_message = message.clone();
                             }
-                        }
-                    }
                     handler
                         .on_battle_message(room_id.as_deref(), ServerMessage::Rated(message))
                         .await;
                 }
 
                 ServerMessage::Rule(rule) => {
-                    if let Some(ref rid) = room_id {
-                        if let Ok(mut battles) = self.state.battles.write() {
-                            if let Some(battle) = battles.get_mut(rid) {
+                    if let Some(ref rid) = room_id
+                        && let Ok(mut battles) = self.state.battles.write()
+                            && let Some(battle) = battles.get_mut(rid) {
                                 battle.rules.push(rule.clone());
                             }
-                        }
-                    }
                     handler
                         .on_battle_message(room_id.as_deref(), ServerMessage::Rule(rule))
                         .await;
@@ -392,9 +370,9 @@ impl KazamClient {
                     details,
                     has_item,
                 } => {
-                    if let Some(ref rid) = room_id {
-                        if let Ok(mut battles) = self.state.battles.write() {
-                            if let Some(battle) = battles.get_mut(rid) {
+                    if let Some(ref rid) = room_id
+                        && let Ok(mut battles) = self.state.battles.write()
+                            && let Some(battle) = battles.get_mut(rid) {
                                 battle.preview.push(PreviewPokemon {
                                     player,
                                     species: details.species.clone(),
@@ -403,8 +381,6 @@ impl KazamClient {
                                     has_item,
                                 });
                             }
-                        }
-                    }
                     handler
                         .on_battle_message(
                             room_id.as_deref(),
@@ -445,11 +421,10 @@ impl KazamClient {
                 // Battle Progress
                 // ===================
                 ServerMessage::Request(ref json) => {
-                    if let Some(ref rid) = room_id {
-                        if let Some(request) = BattleRequest::parse(json) {
+                    if let Some(ref rid) = room_id
+                        && let Some(request) = BattleRequest::parse(json) {
                             handler.on_request(rid, &request).await;
                         }
-                    }
                     handler
                         .on_battle_message(room_id.as_deref(), ServerMessage::Request(json.clone()))
                         .await;
@@ -457,11 +432,10 @@ impl KazamClient {
 
                 ServerMessage::Turn(turn) => {
                     if let Some(ref rid) = room_id {
-                        if let Ok(mut battles) = self.state.battles.write() {
-                            if let Some(battle) = battles.get_mut(rid) {
+                        if let Ok(mut battles) = self.state.battles.write()
+                            && let Some(battle) = battles.get_mut(rid) {
                                 battle.turn = turn;
                             }
-                        }
                         handler.on_turn(rid, turn).await;
                     }
                     handler
@@ -471,11 +445,10 @@ impl KazamClient {
 
                 ServerMessage::Win(ref winner) => {
                     if let Some(ref rid) = room_id {
-                        if let Ok(mut battles) = self.state.battles.write() {
-                            if let Some(battle) = battles.get_mut(rid) {
+                        if let Ok(mut battles) = self.state.battles.write()
+                            && let Some(battle) = battles.get_mut(rid) {
                                 battle.winner = Some(winner.clone());
                             }
-                        }
                         handler.on_win(rid, winner).await;
                     }
                     handler
@@ -485,11 +458,10 @@ impl KazamClient {
 
                 ServerMessage::Tie => {
                     if let Some(ref rid) = room_id {
-                        if let Ok(mut battles) = self.state.battles.write() {
-                            if let Some(battle) = battles.get_mut(rid) {
+                        if let Ok(mut battles) = self.state.battles.write()
+                            && let Some(battle) = battles.get_mut(rid) {
                                 battle.tie = true;
                             }
-                        }
                         handler.on_tie(rid).await;
                     }
                     handler
