@@ -13,7 +13,7 @@ default = []
 serde = ["dep:serde"]
 
 [dependencies]
-kazam-protocol = { path = "../protocol" }
+kazam-protocol = { version = "0.1.0", path = "../protocol" }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]

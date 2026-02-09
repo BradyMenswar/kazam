@@ -9,7 +9,7 @@ keywords = ["pokemon", "showdown", "client", "websocket", "async"]
 categories = ["network-programming", "asynchronous", "api-bindings"]
 
 [dependencies]
-kazam-protocol = { path = "../protocol" }
+kazam-protocol = { version = "0.1.0", path = "../protocol" }
 tokio = { workspace = true, features = ["net", "rt", "rt-multi-thread", "macros", "sync"] }
 tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
 anyhow.workspace = true
@@ -21,4 +21,4 @@ tracing = "0.1"
 
 [dev-dependencies]
 rand = "0.8"
-kazam-battle = { path = "../battle" }
+kazam-battle = { version = "0.1.0", path = "../battle" }
