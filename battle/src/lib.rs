@@ -11,9 +11,10 @@
 //! kazam-protocol (wire format)
 //!        │
 //!        ▼
-//! kazam-battle (domain types + tracking) ← THIS CRATE
+//! kazam-battle (domain types + canonical state reduction) ← THIS CRATE
 //!        │
 //!        ├─> kazam-client (bots using tracked state)
+//!        ├─> kazam-replay (timeline navigation over reduced state)
 //!        └─> kazam-simulator (full simulation)
 //! ```
 //!
@@ -30,7 +31,9 @@
 //! - [`FieldState`] - Global field conditions
 //!
 //! ## State Tracking
-//! - [`TrackedBattle`] - Main entry point for tracking battle state from server messages
+//! - [`TrackedBattle`] - Main entry point for reducing protocol messages into battle state
+//! - [`BattleKnowledge`] - Declares whether the state is public-only, player-enriched, or omniscient
+//! - [`BattleSnapshot`] / [`TurnSnapshot`] - Snapshot helpers for restoring or indexing reduced state
 //!
 //! # Example Usage
 //!
@@ -60,7 +63,14 @@ pub mod tracking;
 pub mod types;
 
 // Re-export main types at crate root for convenience
-pub use tracking::{player_to_index, position_to_slot, TrackedBattle};
+pub use tracking::{
+    BattleKnowledge,
+    BattleSnapshot,
+    TrackedBattle,
+    TurnSnapshot,
+    player_to_index,
+    position_to_slot,
+};
 pub use types::{
     FieldState, PokemonIdentity, PokemonState, SideCondition, SideConditionState, SideState,
     StatStages, Status, Terrain, Type, Volatile, Weather, TYPE_CHART,

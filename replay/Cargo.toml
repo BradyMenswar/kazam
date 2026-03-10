@@ -1,0 +1,16 @@
+[package]
+name = "kazam-replay"
+version.workspace = true
+edition.workspace = true
+description = "Replay loading, indexing, and playback controls for Pokemon Showdown logs"
+license = "MIT"
+repository = "https://github.com/BradyMenswar/kazam"
+readme = "README.md"
+keywords = ["pokemon", "showdown", "replay", "timeline", "playback"]
+categories = ["game-development", "parser-implementations"]
+
+[dependencies]
+kazam-protocol = { version = "0.1.0", path = "../protocol" }
+kazam-battle = { version = "0.2.0", path = "../battle" }
+anyhow.workspace = true
+thiserror.workspace = true

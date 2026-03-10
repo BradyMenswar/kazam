@@ -2,7 +2,9 @@
 members = [
     "protocol",
     "battle",
-    "client"
+    "client",
+    "replay",
+    "team"
 ]
 resolver = "2"
 

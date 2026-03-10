@@ -4,7 +4,7 @@ A Rust library for interacting with Pokemon Showdown servers.
 
 ## Overview
 
-Kazam provides a complete toolkit for building Pokemon Showdown bots and clients in Rust. The project is split into three crates that handle different aspects of the Pokemon Showdown protocol and battle simulation.
+Kazam provides a complete toolkit for building Pokemon Showdown bots and clients in Rust. The project is split into focused crates that handle protocol parsing, battle-state reduction, replay playback, and team conversion.
 
 ## Crates
 
@@ -31,7 +31,7 @@ This crate provides structures and logic for tracking battle state, including Po
 
 ```toml
 [dependencies]
-kazam-battle = "0.1.0"
+kazam-battle = "0.2.0"
 ```
 
 ### kazam-client
@@ -45,6 +45,32 @@ The client crate provides a high-level async interface for connecting to Pokemon
 ```toml
 [dependencies]
 kazam-client = "0.1.0"
+```
+
+### kazam-replay
+
+Replay loading, indexing, and playback controls for Pokemon Showdown logs.
+
+This crate provides replay log parsing, turn indexing, snapshots, and a playback controller for stepping through battles over time.
+
+**Status:** Work in progress - API may change
+
+```toml
+[dependencies]
+kazam-replay = "0.1.0"
+```
+
+### kazam-team
+
+Team import/export and conversion utilities for Pokemon Showdown formats.
+
+This crate provides a canonical Rust team model plus conversion between export, JSON, and packed team formats.
+
+**Status:** Work in progress - API may change
+
+```toml
+[dependencies]
+kazam-team = "0.1.0"
 ```
 
 ## Quick Start

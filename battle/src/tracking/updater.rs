@@ -1,15 +1,15 @@
 //! Update logic for processing ServerMessage into battle state
 
-use kazam_protocol::{BattleRequest, Pokemon, PokemonDetails, ServerMessage};
+use kazam_protocol::{BattleRequest, Pokemon, PokemonDetails, ServerFrame, ServerMessage};
 
-use super::battle::{position_to_slot, TrackedBattle};
+use super::battle::{BattleKnowledge, TrackedBattle, position_to_slot};
 use crate::types::{
     PokemonState, SideCondition, Status, Volatile, Weather,
 };
 
 impl TrackedBattle {
-    /// Update battle state from a server message
-    pub fn update(&mut self, msg: &ServerMessage) {
+    /// Apply a single protocol message to the battle state.
+    pub fn apply_message(&mut self, msg: &ServerMessage) {
         match msg {
             // === Battle Initialization ===
             ServerMessage::BattlePlayer {
@@ -18,7 +18,10 @@ impl TrackedBattle {
                 avatar: _,
                 rating: _,
             } => {
-                self.get_or_create_side(*player, username);
+                let side = self.get_or_create_side(*player, username);
+                if side.username.is_empty() {
+                    side.username = username.clone();
+                }
             }
 
             ServerMessage::TeamSize { player, size: _ } => {
@@ -419,16 +422,42 @@ impl TrackedBattle {
         }
     }
 
-    /// Update battle state from a BattleRequest (provides full team info for our side)
-    pub fn update_from_request(&mut self, request: &BattleRequest) {
+    /// Apply a sequence of protocol messages to the battle state.
+    pub fn apply_messages<'a, I>(&mut self, messages: I)
+    where
+        I: IntoIterator<Item = &'a ServerMessage>,
+    {
+        for message in messages {
+            self.apply_message(message);
+        }
+    }
+
+    /// Apply all protocol messages contained in a parsed frame.
+    pub fn apply_frame(&mut self, frame: &ServerFrame) {
+        self.apply_messages(frame.messages.iter());
+    }
+
+    /// Apply private request data for one player's view of the battle.
+    ///
+    /// This is an optional enrichment step used by live clients. Replay-style
+    /// omniscient logs can skip it entirely.
+    pub fn apply_request(&mut self, request: &BattleRequest) {
         // Extract perspective from side info
         if let Some(ref side_info) = request.side {
             // Parse player from side id (e.g., "p1" -> Player::P1)
             if let Some(player) = kazam_protocol::Player::parse(&side_info.id) {
-                self.set_perspective(player);
+                if self.knowledge() != BattleKnowledge::Omniscient {
+                    self.set_knowledge(BattleKnowledge::Player(player));
+                }
+                if self.viewpoint().is_none() {
+                    self.set_viewpoint(player);
+                }
 
                 // Get or create our side
                 let side = self.get_or_create_side(player, &side_info.name);
+                if side.username.is_empty() {
+                    side.username = side_info.name.clone();
+                }
 
                 // Sync Pokemon from request (has full info)
                 for (i, req_poke) in side_info.pokemon.iter().enumerate() {
@@ -508,6 +537,16 @@ impl TrackedBattle {
         }
     }
 
+    /// Backwards-compatible alias for `apply_message`.
+    pub fn update(&mut self, msg: &ServerMessage) {
+        self.apply_message(msg);
+    }
+
+    /// Backwards-compatible alias for `apply_request`.
+    pub fn update_from_request(&mut self, request: &BattleRequest) {
+        self.apply_request(request);
+    }
+
     /// Handle a switch (or drag) message
     fn handle_switch(
         &mut self,
@@ -578,7 +617,9 @@ impl TrackedBattle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kazam_protocol::{GameType, HpStatus, Player, Stat};
+    use kazam_protocol::{GameType, HpStatus, Player, Stat, parse_server_message};
+
+    use crate::{BattleKnowledge, SideCondition, Weather};
 
     fn create_test_pokemon(name: &str, _level: u8) -> Pokemon {
         Pokemon {
@@ -602,7 +643,7 @@ mod tests {
     fn test_update_battle_player() {
         let mut battle = TrackedBattle::new();
 
-        battle.update(&ServerMessage::BattlePlayer {
+        battle.apply_message(&ServerMessage::BattlePlayer {
             player: Player::P1,
             username: "Alice".to_string(),
             avatar: "1".to_string(),
@@ -618,7 +659,7 @@ mod tests {
         let mut battle = TrackedBattle::new();
         battle.get_or_create_side(Player::P1, "Test");
 
-        battle.update(&ServerMessage::GameType(GameType::Doubles));
+        battle.apply_message(&ServerMessage::GameType(GameType::Doubles));
 
         assert_eq!(battle.game_type, Some(GameType::Doubles));
         assert_eq!(
@@ -632,7 +673,7 @@ mod tests {
         let mut battle = TrackedBattle::new();
         battle.get_or_create_side(Player::P1, "Test");
 
-        battle.update(&ServerMessage::Switch {
+        battle.apply_message(&ServerMessage::Switch {
             pokemon: create_test_pokemon("Pikachu", 50),
             details: create_test_details("Pikachu"),
             hp_status: Some(HpStatus {
@@ -654,7 +695,7 @@ mod tests {
         battle.get_or_create_side(Player::P1, "Test");
 
         // First switch in
-        battle.update(&ServerMessage::Switch {
+        battle.apply_message(&ServerMessage::Switch {
             pokemon: create_test_pokemon("Pikachu", 50),
             details: create_test_details("Pikachu"),
             hp_status: Some(HpStatus {
@@ -665,7 +706,7 @@ mod tests {
         });
 
         // Take damage
-        battle.update(&ServerMessage::Damage {
+        battle.apply_message(&ServerMessage::Damage {
             pokemon: create_test_pokemon("Pikachu", 50),
             hp_status: Some(HpStatus {
                 current: 50,
@@ -683,13 +724,13 @@ mod tests {
         let mut battle = TrackedBattle::new();
         battle.get_or_create_side(Player::P1, "Test");
 
-        battle.update(&ServerMessage::Switch {
+        battle.apply_message(&ServerMessage::Switch {
             pokemon: create_test_pokemon("Pikachu", 50),
             details: create_test_details("Pikachu"),
             hp_status: None,
         });
 
-        battle.update(&ServerMessage::Boost {
+        battle.apply_message(&ServerMessage::Boost {
             pokemon: create_test_pokemon("Pikachu", 50),
             stat: Stat::Atk,
             amount: 2,
@@ -704,13 +745,13 @@ mod tests {
         let mut battle = TrackedBattle::new();
         battle.get_or_create_side(Player::P1, "Test");
 
-        battle.update(&ServerMessage::Switch {
+        battle.apply_message(&ServerMessage::Switch {
             pokemon: create_test_pokemon("Pikachu", 50),
             details: create_test_details("Pikachu"),
             hp_status: None,
         });
 
-        battle.update(&ServerMessage::Status {
+        battle.apply_message(&ServerMessage::Status {
             pokemon: create_test_pokemon("Pikachu", 50),
             status: "par".to_string(),
         });
@@ -718,7 +759,7 @@ mod tests {
         let poke = &battle.get_side(Player::P1).unwrap().pokemon[0];
         assert_eq!(poke.status, Some(Status::Paralysis));
 
-        battle.update(&ServerMessage::CureStatus {
+        battle.apply_message(&ServerMessage::CureStatus {
             pokemon: create_test_pokemon("Pikachu", 50),
             status: "par".to_string(),
         });
@@ -731,7 +772,7 @@ mod tests {
     fn test_update_weather() {
         let mut battle = TrackedBattle::new();
 
-        battle.update(&ServerMessage::Weather {
+        battle.apply_message(&ServerMessage::Weather {
             weather: "SunnyDay".to_string(),
             upkeep: false,
         });
@@ -739,7 +780,7 @@ mod tests {
         assert_eq!(battle.field.weather, Some(Weather::Sun));
 
         // Upkeep messages shouldn't change weather
-        battle.update(&ServerMessage::Weather {
+        battle.apply_message(&ServerMessage::Weather {
             weather: "SunnyDay".to_string(),
             upkeep: true,
         });
@@ -752,13 +793,13 @@ mod tests {
         let mut battle = TrackedBattle::new();
         battle.get_or_create_side(Player::P1, "Test");
 
-        battle.update(&ServerMessage::Switch {
+        battle.apply_message(&ServerMessage::Switch {
             pokemon: create_test_pokemon("Pikachu", 50),
             details: create_test_details("Pikachu"),
             hp_status: None,
         });
 
-        battle.update(&ServerMessage::Faint(create_test_pokemon("Pikachu", 50)));
+        battle.apply_message(&ServerMessage::Faint(create_test_pokemon("Pikachu", 50)));
 
         let poke = &battle.get_side(Player::P1).unwrap().pokemon[0];
         assert!(poke.fainted);
@@ -769,9 +810,380 @@ mod tests {
     fn test_update_win() {
         let mut battle = TrackedBattle::new();
 
-        battle.update(&ServerMessage::Win("Alice".to_string()));
+        battle.apply_message(&ServerMessage::Win("Alice".to_string()));
 
         assert!(battle.ended);
         assert_eq!(battle.winner, Some("Alice".to_string()));
+    }
+
+    #[test]
+    fn test_apply_request_promotes_player_knowledge() {
+        let json = serde_json::json!({
+            "rqid": 7,
+            "side": {
+                "name": "Alice",
+                "id": "p1",
+                "pokemon": [{
+                    "ident": "p1: Pikachu",
+                    "details": "Pikachu, L50",
+                    "condition": "100/100",
+                    "active": true,
+                    "moves": ["thunderbolt", "surf"],
+                    "ability": "Static",
+                    "item": "Light Ball"
+                }]
+            }
+        });
+
+        let request = BattleRequest::parse(&json).unwrap();
+        let mut battle = TrackedBattle::new();
+
+        battle.apply_request(&request);
+
+        assert_eq!(battle.knowledge(), BattleKnowledge::Player(Player::P1));
+        assert_eq!(battle.viewpoint(), Some(Player::P1));
+
+        let me = battle.me().unwrap();
+        assert_eq!(me.username, "Alice");
+        assert_eq!(me.pokemon.len(), 1);
+        assert_eq!(me.pokemon[0].known_ability.as_deref(), Some("Static"));
+    }
+
+    #[test]
+    fn test_apply_replay_log_in_omniscient_mode() {
+        let log = r#"|inactive|Battle timer is ON: inactive players will automatically lose when time's up.
+|J|Pokebasket
+|J|Alf
+|player|p1|Pokebasket|278
+|player|p2|Alf|44
+|gametype|singles
+|gen|3
+|tier|[Gen 3] OU
+|rule|Sleep Clause Mod: Limit one foe put to sleep
+|rule|Species Clause: Limit one of each Pokémon
+|rule|OHKO Clause: OHKO moves are banned
+|rule|Moody Clause: Moody is banned
+|rule|Evasion Moves Clause: Evasion moves are banned
+|rule|Endless Battle Clause: Forcing endless battles is banned
+|rule|HP Percentage Mod: HP is shown in percentages
+|
+|start
+|switch|p1a: Hill|Salamence, M|331/331
+|switch|p2a: Salamence|Salamence, M|331/331
+|-ability|p1a: Hill|Intimidate|[of] p2a: Salamence
+|-unboost|p2a: Salamence|atk|1
+|-ability|p2a: Salamence|Intimidate|[of] p1a: Hill
+|-unboost|p1a: Hill|atk|1
+|turn|1
+|J|Da Raikage
+|J|IZANAGI-N0-0KAMI
+|J|Tesung
+|J|Malekith
+|
+|switch|p1a: Lutra|Milotic, F|394/394
+|move|p2a: Salamence|Dragon Claw|p1a: Lutra
+|-damage|p1a: Lutra|267/394
+|
+|-heal|p1a: Lutra|291/394|[from] item: Leftovers
+|turn|2
+|
+|switch|p2a: Snorlax|Snorlax, M|497/497
+|move|p1a: Lutra|Recover|p1a: Lutra
+|-heal|p1a: Lutra|394/394
+|
+|turn|3
+|
+|switch|p1a: Conflict|Skarmory, F|334/334
+|move|p2a: Snorlax|Body Slam|p1a: Conflict
+|-resisted|p1a: Conflict
+|-damage|p1a: Conflict|283/334
+|
+|-heal|p1a: Conflict|303/334|[from] item: Leftovers
+|turn|4
+|
+|switch|p2a: Salamence|Salamence, M|331/331
+|-ability|p2a: Salamence|Intimidate|[of] p1a: Conflict
+|-unboost|p1a: Conflict|atk|1
+|move|p1a: Conflict|Spikes|p2a: Salamence
+|-sidestart|p2: Alf|Spikes
+|
+|-heal|p1a: Conflict|323/334|[from] item: Leftovers
+|turn|5
+|J|Sken
+|
+|switch|p1a: Lutra|Milotic, F|394/394
+|move|p2a: Salamence|Dragon Claw|p1a: Lutra
+|-crit|p1a: Lutra
+|-damage|p1a: Lutra|151/394
+|
+|-heal|p1a: Lutra|175/394|[from] item: Leftovers
+|turn|6
+|
+|switch|p2a: Snorlax|Snorlax, M|497/497
+|-damage|p2a: Snorlax|435/497|[from] Spikes
+|move|p1a: Lutra|Recover|p1a: Lutra
+|-heal|p1a: Lutra|372/394
+|
+|-heal|p1a: Lutra|394/394|[from] item: Leftovers
+|-heal|p2a: Snorlax|466/497|[from] item: Leftovers
+|turn|7
+|
+|switch|p1a: Conflict|Skarmory, F|323/334
+|move|p2a: Snorlax|Curse|p2a: Snorlax
+|-boost|p2a: Snorlax|atk|1
+|-boost|p2a: Snorlax|def|1
+|-unboost|p2a: Snorlax|spe|1
+|
+|-heal|p1a: Conflict|334/334|[from] item: Leftovers
+|-heal|p2a: Snorlax|497/497|[from] item: Leftovers
+|turn|8
+|J|Jirachee
+|
+|move|p1a: Conflict|Spikes|p2a: Snorlax
+|-sidestart|p2: Alf|Spikes
+|move|p2a: Snorlax|Self-Destruct|p1a: Conflict
+|-resisted|p1a: Conflict
+|-damage|p1a: Conflict|28/334
+|faint|p2a: Snorlax
+|L|Jirachee
+|
+|switch|p2a: Swampert|Swampert, M|341/341
+|-damage|p2a: Swampert|285/341|[from] Spikes
+|
+|-heal|p1a: Conflict|48/334|[from] item: Leftovers
+|turn|9
+|J|avaawa
+|
+|move|p1a: Conflict|Spikes|p2a: Swampert
+|-sidestart|p2: Alf|Spikes
+|move|p2a: Swampert|Ice Beam|p1a: Conflict
+|-damage|p1a: Conflict|0 fnt
+|faint|p1a: Conflict
+|
+|switch|p1a: Lutra|Milotic, F|394/394
+|
+|turn|10
+|
+|switch|p2a: Salamence|Salamence, M|331/331
+|-ability|p2a: Salamence|Intimidate|[of] p1a: Lutra
+|-unboost|p1a: Lutra|atk|1
+|move|p1a: Lutra|Surf|p2a: Salamence
+|-resisted|p2a: Salamence
+|-damage|p2a: Salamence|253/331
+|
+|turn|11
+|
+|switch|p2a: Metagross|Metagross|347/347
+|-damage|p2a: Metagross|261/347|[from] Spikes
+|move|p1a: Lutra|Ice Beam|p2a: Metagross
+|-resisted|p2a: Metagross
+|-damage|p2a: Metagross|220/347
+|
+|-heal|p2a: Metagross|241/347|[from] item: Leftovers
+|turn|12
+|
+|switch|p1a: Hill|Salamence, M|331/331
+|-ability|p1a: Hill|Intimidate|[of] p2a: Metagross
+|-fail|p2a: Metagross|unboost|[from] ability: Clear Body|[of] p2a: Metagross
+|move|p2a: Metagross|Psychic|p1a: Hill
+|-damage|p1a: Hill|163/331
+|
+|-heal|p1a: Hill|183/331|[from] item: Leftovers
+|-heal|p2a: Metagross|262/347|[from] item: Leftovers
+|turn|13
+|
+|switch|p2a: Salamence|Salamence, M|253/331
+|-ability|p2a: Salamence|Intimidate|[of] p1a: Hill
+|-unboost|p1a: Hill|atk|1
+|move|p1a: Hill|Fire Blast|p2a: Salamence
+|-resisted|p2a: Salamence
+|-damage|p2a: Salamence|158/331
+|
+|-heal|p1a: Hill|203/331|[from] item: Leftovers
+|turn|14
+|
+|switch|p1a: Lutra|Milotic, F|394/394
+|move|p2a: Salamence|Dragon Claw|p1a: Lutra
+|-damage|p1a: Lutra|280/394
+|
+|-heal|p1a: Lutra|304/394|[from] item: Leftovers
+|turn|15
+|
+|move|p2a: Salamence|Hidden Power|p1a: Lutra
+|-supereffective|p1a: Lutra
+|-damage|p1a: Lutra|182/394
+|move|p1a: Lutra|Recover|p1a: Lutra
+|-heal|p1a: Lutra|379/394
+|
+|-heal|p1a: Lutra|394/394|[from] item: Leftovers
+|turn|16
+|
+|switch|p2a: Tyranitar|Tyranitar, M|345/345
+|-damage|p2a: Tyranitar|259/345|[from] Spikes
+|-weather|Sandstorm|[from] ability: Sand Stream|[of] p2a: Tyranitar
+|move|p1a: Lutra|Surf|p2a: Tyranitar
+|-supereffective|p2a: Tyranitar
+|-damage|p2a: Tyranitar|47/345
+|
+|-weather|Sandstorm|[upkeep]
+|-damage|p1a: Lutra|370/394|[from] sandstorm
+|-heal|p2a: Tyranitar|68/345|[from] item: Leftovers
+|-heal|p1a: Lutra|394/394|[from] item: Leftovers
+|turn|17
+|
+|move|p2a: Tyranitar|Rock Slide|p1a: Lutra
+|-damage|p1a: Lutra|262/394
+|move|p1a: Lutra|Surf|p2a: Tyranitar
+|-supereffective|p2a: Tyranitar
+|-damage|p2a: Tyranitar|0 fnt
+|faint|p2a: Tyranitar
+|
+|switch|p2a: Metagross|Metagross|262/347
+|-damage|p2a: Metagross|176/347|[from] Spikes
+|
+|-weather|Sandstorm|[upkeep]
+|-damage|p1a: Lutra|238/394|[from] sandstorm
+|-heal|p1a: Lutra|262/394|[from] item: Leftovers
+|-heal|p2a: Metagross|197/347|[from] item: Leftovers
+|turn|18
+|
+|switch|p1a: Reik|Raikou|322/322
+|move|p2a: Metagross|Explosion|p1a: Reik
+|-damage|p1a: Reik|0 fnt
+|faint|p2a: Metagross
+|faint|p1a: Reik
+|
+|switch|p2a: Aerodactyl|Aerodactyl, F|300/300
+|switch|p1a: Lutra|Milotic, F|262/394
+|
+|-weather|Sandstorm|[upkeep]
+|-damage|p1a: Lutra|238/394|[from] sandstorm
+|-heal|p1a: Lutra|262/394|[from] item: Leftovers
+|turn|19
+|
+|move|p2a: Aerodactyl|Rock Slide|p1a: Lutra
+|-miss|p2a: Aerodactyl|p1a: Lutra
+|move|p1a: Lutra|Recover|p1a: Lutra
+|-heal|p1a: Lutra|394/394
+|
+|-weather|Sandstorm|[upkeep]
+|-damage|p1a: Lutra|370/394|[from] sandstorm
+|-heal|p1a: Lutra|394/394|[from] item: Leftovers
+|turn|20
+|
+|move|p2a: Aerodactyl|Rock Slide|p1a: Lutra
+|-damage|p1a: Lutra|240/394
+|cant|p1a: Lutra|flinch
+|
+|-weather|Sandstorm|[upkeep]
+|-damage|p1a: Lutra|216/394|[from] sandstorm
+|-heal|p1a: Lutra|240/394|[from] item: Leftovers
+|turn|21
+|
+|move|p2a: Aerodactyl|Rock Slide|p1a: Lutra
+|-damage|p1a: Lutra|96/394
+|cant|p1a: Lutra|flinch
+|
+|-weather|Sandstorm|[upkeep]
+|-damage|p1a: Lutra|72/394|[from] sandstorm
+|-heal|p1a: Lutra|96/394|[from] item: Leftovers
+|turn|22
+|c|★Pokebasket|ah
+|c|★Pokebasket|xD
+|J|Cat B1ack
+|
+|switch|p1a: Hill|Salamence, M|203/331
+|-ability|p1a: Hill|Intimidate|[of] p2a: Aerodactyl
+|-unboost|p2a: Aerodactyl|atk|1
+|move|p2a: Aerodactyl|Rock Slide|p1a: Hill
+|-supereffective|p1a: Hill
+|-damage|p1a: Hill|0 fnt
+|faint|p1a: Hill
+|
+|switch|p1a: PROBLEMS|Tyranitar, M|345/345
+|
+|-weather|Sandstorm|[upkeep]
+|turn|23
+|
+|switch|p2a: Salamence|Salamence, M|158/331
+|-ability|p2a: Salamence|Intimidate|[of] p1a: PROBLEMS
+|-unboost|p1a: PROBLEMS|atk|1
+|move|p1a: PROBLEMS|Dragon Dance|p1a: PROBLEMS
+|-boost|p1a: PROBLEMS|atk|1
+|-boost|p1a: PROBLEMS|spe|1
+|
+|-weather|Sandstorm|[upkeep]
+|-damage|p2a: Salamence|138/331|[from] sandstorm
+|turn|24
+|
+|move|p1a: PROBLEMS|Rock Slide|p2a: Salamence
+|-supereffective|p2a: Salamence
+|-damage|p2a: Salamence|0 fnt
+|faint|p2a: Salamence
+|
+|switch|p2a: Swampert|Swampert, M|285/341
+|-damage|p2a: Swampert|200/341|[from] Spikes
+|
+|-weather|Sandstorm|[upkeep]
+|turn|25
+|
+|move|p1a: PROBLEMS|Dragon Dance|p1a: PROBLEMS
+|-boost|p1a: PROBLEMS|atk|1
+|-boost|p1a: PROBLEMS|spe|1
+|move|p2a: Swampert|Surf|p1a: PROBLEMS
+|-supereffective|p1a: PROBLEMS
+|-damage|p1a: PROBLEMS|79/345
+|
+|-weather|Sandstorm|[upkeep]
+|-heal|p1a: PROBLEMS|100/345|[from] item: Leftovers
+|turn|26
+|
+|move|p1a: PROBLEMS|Earthquake|p2a: Swampert
+|-damage|p2a: Swampert|0 fnt
+|faint|p2a: Swampert
+|
+|switch|p2a: Aerodactyl|Aerodactyl, F|300/300
+|
+|-weather|Sandstorm|[upkeep]
+|-heal|p1a: PROBLEMS|121/345|[from] item: Leftovers
+|turn|27
+|
+|move|p1a: PROBLEMS|Rock Slide|p2a: Aerodactyl
+|-supereffective|p2a: Aerodactyl
+|-damage|p2a: Aerodactyl|0 fnt
+|faint|p2a: Aerodactyl
+|
+|win|Pokebasket"#;
+
+        let mut battle = TrackedBattle::omniscient();
+        battle.set_viewpoint(Player::P1);
+
+        for line in log.lines() {
+            let message = parse_server_message(line).unwrap();
+            battle.apply_message(&message);
+        }
+
+        assert_eq!(battle.knowledge(), BattleKnowledge::Omniscient);
+        assert_eq!(battle.turn, 27);
+        assert_eq!(battle.winner.as_deref(), Some("Pokebasket"));
+        assert!(battle.ended);
+        assert_eq!(battle.field.weather, Some(Weather::Sand));
+
+        let p1 = battle.get_side(Player::P1).unwrap();
+        let p2 = battle.get_side(Player::P2).unwrap();
+
+        assert_eq!(p1.username, "Pokebasket");
+        assert_eq!(p2.username, "Alf");
+        assert_eq!(p2.condition_layers(SideCondition::Spikes), 3);
+        assert!(p2.all_fainted());
+
+        let active = p1.active_pokemon().unwrap();
+        assert_eq!(active.identity.species, "Tyranitar");
+        assert_eq!(active.hp_current, 121);
+        assert_eq!(active.hp_max, Some(345));
+
+        let milotic = p1.find_pokemon("Lutra").unwrap();
+        assert_eq!(p1.pokemon[milotic].hp_current, 96);
+        assert_eq!(p1.pokemon[milotic].hp_max, Some(394));
     }
 }

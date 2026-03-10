@@ -1,14 +1,32 @@
-//! TrackedBattle - main battle state tracking struct
+//! TrackedBattle - canonical battle state reduced from protocol messages
 
 use kazam_protocol::{GameType, Player};
 
 use crate::types::{FieldState, SideState};
 
+/// How much private information has been merged into this battle state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BattleKnowledge {
+    /// Only public battle log information has been applied.
+    #[default]
+    Public,
+    /// Public battle log information plus request data for one player.
+    Player(Player),
+    /// Omniscient state assembled from a full-observer source such as a replay export.
+    Omniscient,
+}
+
 /// A battle being tracked from server messages
 ///
-/// This struct reconstructs battle state from the protocol messages
-/// received from the Pokemon Showdown server. It maintains the perspective
-/// of one player and tracks what information has been revealed.
+/// This struct is the canonical reducer from Pokemon Showdown protocol messages
+/// into battle state. It can be used in multiple modes:
+///
+/// - public tracking from battle log messages alone
+/// - player-aware live tracking by enriching with `|request|` data
+/// - omniscient replay tracking from full-observer transcripts
+///
+/// The optional viewpoint is only a query convenience. It does not affect the
+/// underlying reduced state.
 #[derive(Debug, Clone)]
 pub struct TrackedBattle {
     // === Battle metadata ===
@@ -32,9 +50,12 @@ pub struct TrackedBattle {
     /// Up to 4 players for multi battles
     pub(crate) sides: [Option<SideState>; 4],
 
-    // === Perspective ===
-    /// Which player we are (for me()/opponent() methods)
-    perspective: Option<Player>,
+    // === Knowledge / viewpoint ===
+    /// Which private information sources have been applied to this state.
+    knowledge: BattleKnowledge,
+
+    /// Which player this state is currently being viewed from, if any.
+    viewpoint: Option<Player>,
 
     // === Outcome ===
     /// Whether the battle has ended
@@ -57,31 +78,72 @@ impl TrackedBattle {
             turn: 0,
             field: FieldState::new(),
             sides: [None, None, None, None],
-            perspective: None,
+            knowledge: BattleKnowledge::Public,
+            viewpoint: None,
             ended: false,
             winner: None,
             tie: false,
         }
     }
 
-    /// Set the perspective (which player we are)
-    pub fn set_perspective(&mut self, player: Player) {
-        self.perspective = Some(player);
+    /// Create a tracker intended for omniscient sources such as replay exports.
+    pub fn omniscient() -> Self {
+        let mut battle = Self::new();
+        battle.knowledge = BattleKnowledge::Omniscient;
+        battle
     }
 
-    /// Get the current perspective
+    /// Create a tracker intended for a specific player's live battle view.
+    pub fn for_player(player: Player) -> Self {
+        let mut battle = Self::new();
+        battle.knowledge = BattleKnowledge::Player(player);
+        battle.viewpoint = Some(player);
+        battle
+    }
+
+    /// Set the current knowledge mode explicitly.
+    pub fn set_knowledge(&mut self, knowledge: BattleKnowledge) {
+        self.knowledge = knowledge;
+    }
+
+    /// Get the current knowledge mode.
+    pub fn knowledge(&self) -> BattleKnowledge {
+        self.knowledge
+    }
+
+    /// Set the current viewpoint.
+    pub fn set_viewpoint(&mut self, player: Player) {
+        self.viewpoint = Some(player);
+    }
+
+    /// Clear the current viewpoint.
+    pub fn clear_viewpoint(&mut self) {
+        self.viewpoint = None;
+    }
+
+    /// Get the current viewpoint.
+    pub fn viewpoint(&self) -> Option<Player> {
+        self.viewpoint
+    }
+
+    /// Backwards-compatible alias for `set_viewpoint`.
+    pub fn set_perspective(&mut self, player: Player) {
+        self.set_viewpoint(player);
+    }
+
+    /// Backwards-compatible alias for `viewpoint`.
     pub fn perspective(&self) -> Option<Player> {
-        self.perspective
+        self.viewpoint()
     }
 
     /// Get our side (based on perspective)
     pub fn me(&self) -> Option<&SideState> {
-        self.perspective.and_then(|p| self.get_side(p))
+        self.viewpoint.and_then(|p| self.get_side(p))
     }
 
     /// Get our side mutably
     pub fn me_mut(&mut self) -> Option<&mut SideState> {
-        self.perspective.and_then(|p| self.get_side_mut(p))
+        self.viewpoint.and_then(|p| self.get_side_mut(p))
     }
 
     /// Get opponent's side (assumes 1v1 battle)
@@ -98,7 +160,7 @@ impl TrackedBattle {
 
     /// Get the opponent player (assumes 1v1)
     fn opponent_player(&self) -> Option<Player> {
-        match self.perspective? {
+        match self.viewpoint? {
             Player::P1 => Some(Player::P2),
             Player::P2 => Some(Player::P1),
             Player::P3 => Some(Player::P4),
@@ -213,8 +275,9 @@ mod tests {
         let battle = TrackedBattle::new();
         assert_eq!(battle.turn, 0);
         assert!(!battle.ended);
-        assert!(battle.perspective.is_none());
+        assert!(battle.viewpoint.is_none());
         assert!(battle.game_type.is_none());
+        assert_eq!(battle.knowledge(), BattleKnowledge::Public);
     }
 
     #[test]
@@ -222,6 +285,20 @@ mod tests {
         let mut battle = TrackedBattle::new();
         battle.set_perspective(Player::P1);
         assert_eq!(battle.perspective(), Some(Player::P1));
+    }
+
+    #[test]
+    fn test_omniscient_battle() {
+        let battle = TrackedBattle::omniscient();
+        assert_eq!(battle.knowledge(), BattleKnowledge::Omniscient);
+        assert!(battle.viewpoint().is_none());
+    }
+
+    #[test]
+    fn test_for_player_battle() {
+        let battle = TrackedBattle::for_player(Player::P2);
+        assert_eq!(battle.knowledge(), BattleKnowledge::Player(Player::P2));
+        assert_eq!(battle.viewpoint(), Some(Player::P2));
     }
 
     #[test]
