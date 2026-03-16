@@ -307,16 +307,22 @@ pub enum ServerMessage {
     Damage {
         pokemon: Pokemon,
         hp_status: Option<HpStatus>,
+        from: Option<String>,
     },
 
     /// |-heal|POKEMON|HP STATUS
     Heal {
         pokemon: Pokemon,
         hp_status: Option<HpStatus>,
+        from: Option<String>,
     },
 
     /// |-sethp|POKEMON|HP
-    SetHp { pokemon: Pokemon, hp_status: Option<HpStatus> },
+    SetHp {
+        pokemon: Pokemon,
+        hp_status: Option<HpStatus>,
+        from: Option<String>,
+    },
 
     /// |-status|POKEMON|STATUS
     Status { pokemon: Pokemon, status: String },

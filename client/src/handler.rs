@@ -220,13 +220,25 @@ pub trait KazamHandler: Send {
     // ===================
 
     /// Called when |-damage| is received
-    async fn on_damage(&mut self, room_id: &str, pokemon: &Pokemon, hp_status: Option<&HpStatus>) {
-        let _ = (room_id, pokemon, hp_status);
+    async fn on_damage(
+        &mut self,
+        room_id: &str,
+        pokemon: &Pokemon,
+        hp_status: Option<&HpStatus>,
+        from: Option<&str>,
+    ) {
+        let _ = (room_id, pokemon, hp_status, from);
     }
 
     /// Called when |-heal| is received
-    async fn on_heal(&mut self, room_id: &str, pokemon: &Pokemon, hp_status: Option<&HpStatus>) {
-        let _ = (room_id, pokemon, hp_status);
+    async fn on_heal(
+        &mut self,
+        room_id: &str,
+        pokemon: &Pokemon,
+        hp_status: Option<&HpStatus>,
+        from: Option<&str>,
+    ) {
+        let _ = (room_id, pokemon, hp_status, from);
     }
 
     // ===================

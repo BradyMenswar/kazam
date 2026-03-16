@@ -587,9 +587,10 @@ impl KazamClient {
                 ServerMessage::Damage {
                     ref pokemon,
                     ref hp_status,
+                    ref from,
                 } => {
                     if let Some(ref rid) = room_id {
-                        handler.on_damage(rid, pokemon, hp_status.as_ref()).await;
+                        handler.on_damage(rid, pokemon, hp_status.as_ref(), from.as_deref()).await;
                     }
                     handler
                         .on_battle_message(
@@ -597,6 +598,7 @@ impl KazamClient {
                             ServerMessage::Damage {
                                 pokemon: pokemon.clone(),
                                 hp_status: hp_status.clone(),
+                                from: from.clone(),
                             },
                         )
                         .await;
@@ -605,9 +607,10 @@ impl KazamClient {
                 ServerMessage::Heal {
                     ref pokemon,
                     ref hp_status,
+                    ref from,
                 } => {
                     if let Some(ref rid) = room_id {
-                        handler.on_heal(rid, pokemon, hp_status.as_ref()).await;
+                        handler.on_heal(rid, pokemon, hp_status.as_ref(), from.as_deref()).await;
                     }
                     handler
                         .on_battle_message(
@@ -615,6 +618,7 @@ impl KazamClient {
                             ServerMessage::Heal {
                                 pokemon: pokemon.clone(),
                                 hp_status: hp_status.clone(),
+                                from: from.clone(),
                             },
                         )
                         .await;

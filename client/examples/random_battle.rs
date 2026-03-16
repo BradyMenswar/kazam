@@ -171,7 +171,13 @@ impl KazamHandler for RandomBattleBot {
         self.handle.search("gen9randombattle").ok();
     }
 
-    async fn on_damage(&mut self, room_id: &str, pokemon: &Pokemon, hp_status: Option<&HpStatus>) {
+    async fn on_damage(
+        &mut self,
+        room_id: &str,
+        pokemon: &Pokemon,
+        hp_status: Option<&HpStatus>,
+        _from: Option<&str>,
+    ) {
         if let Some(hp) = hp_status {
             if hp.max.is_some() {
                 println!(

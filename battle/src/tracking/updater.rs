@@ -82,19 +82,31 @@ impl TrackedBattle {
             }
 
             // === HP Changes ===
-            ServerMessage::Damage { pokemon, hp_status } => {
+            ServerMessage::Damage {
+                pokemon,
+                hp_status,
+                from: _,
+            } => {
                 if let (Some(poke), Some(hp)) = (self.find_pokemon_mut(pokemon), hp_status) {
                     poke.apply_hp_status(hp);
                 }
             }
 
-            ServerMessage::Heal { pokemon, hp_status } => {
+            ServerMessage::Heal {
+                pokemon,
+                hp_status,
+                from: _,
+            } => {
                 if let (Some(poke), Some(hp)) = (self.find_pokemon_mut(pokemon), hp_status) {
                     poke.apply_hp_status(hp);
                 }
             }
 
-            ServerMessage::SetHp { pokemon, hp_status } => {
+            ServerMessage::SetHp {
+                pokemon,
+                hp_status,
+                from: _,
+            } => {
                 if let (Some(poke), Some(hp)) = (self.find_pokemon_mut(pokemon), hp_status) {
                     poke.apply_hp_status(hp);
                 }
@@ -713,6 +725,7 @@ mod tests {
                 max: Some(100),
                 status: None,
             }),
+            from: None,
         });
 
         let poke = &battle.get_side(Player::P1).unwrap().pokemon[0];

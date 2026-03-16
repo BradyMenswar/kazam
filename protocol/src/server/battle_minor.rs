@@ -48,24 +48,45 @@ pub fn parse_miss(parts: &[&str]) -> Result<ServerMessage> {
 pub fn parse_damage(parts: &[&str]) -> Result<ServerMessage> {
     let pokemon = parse_pokemon(parts, 2)?;
     let hp_status = parse_hp_status(parts, 3);
+    let from = parts
+        .iter()
+        .find_map(|p| p.strip_prefix("[from] ").map(|s| s.to_string()));
 
-    Ok(ServerMessage::Damage { pokemon, hp_status })
+    Ok(ServerMessage::Damage {
+        pokemon,
+        hp_status,
+        from,
+    })
 }
 
 /// Parse |-heal|POKEMON|HP STATUS
 pub fn parse_heal(parts: &[&str]) -> Result<ServerMessage> {
     let pokemon = parse_pokemon(parts, 2)?;
     let hp_status = parse_hp_status(parts, 3);
+    let from = parts
+        .iter()
+        .find_map(|p| p.strip_prefix("[from] ").map(|s| s.to_string()));
 
-    Ok(ServerMessage::Heal { pokemon, hp_status })
+    Ok(ServerMessage::Heal {
+        pokemon,
+        hp_status,
+        from,
+    })
 }
 
 /// Parse |-sethp|POKEMON|HP
 pub fn parse_sethp(parts: &[&str]) -> Result<ServerMessage> {
     let pokemon = parse_pokemon(parts, 2)?;
     let hp_status = parse_hp_status(parts, 3);
+    let from = parts
+        .iter()
+        .find_map(|p| p.strip_prefix("[from] ").map(|s| s.to_string()));
 
-    Ok(ServerMessage::SetHp { pokemon, hp_status })
+    Ok(ServerMessage::SetHp {
+        pokemon,
+        hp_status,
+        from,
+    })
 }
 
 /// Parse |-status|POKEMON|STATUS
