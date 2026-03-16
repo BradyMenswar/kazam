@@ -1,6 +1,6 @@
 [package]
 name = "kazam-replay"
-version.workspace = true
+version = "0.2.0"
 edition.workspace = true
 description = "Replay loading, indexing, and playback controls for Pokemon Showdown logs"
 license = "MIT"
@@ -10,7 +10,7 @@ keywords = ["pokemon", "showdown", "replay", "timeline", "playback"]
 categories = ["game-development", "parser-implementations"]
 
 [dependencies]
-kazam-protocol = { version = "0.1.0", path = "../protocol" }
-kazam-battle = { version = "0.2.0", path = "../battle" }
+kazam-protocol = { version = "0.2.0", path = "../protocol" }
+kazam-battle = { version = "0.3.0", path = "../battle" }
 anyhow.workspace = true
 thiserror.workspace = true

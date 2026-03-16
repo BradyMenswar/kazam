@@ -18,7 +18,7 @@ This crate provides all the type definitions and parsers needed to communicate w
 
 ```toml
 [dependencies]
-kazam-protocol = "0.1.0"
+kazam-protocol = "0.2.0"
 ```
 
 ### kazam-battle
@@ -31,7 +31,7 @@ This crate provides structures and logic for tracking battle state, including Po
 
 ```toml
 [dependencies]
-kazam-battle = "0.2.0"
+kazam-battle = "0.3.0"
 ```
 
 ### kazam-client
@@ -44,7 +44,7 @@ The client crate provides a high-level async interface for connecting to Pokemon
 
 ```toml
 [dependencies]
-kazam-client = "0.1.0"
+kazam-client = "0.2.0"
 ```
 
 ### kazam-replay
@@ -57,7 +57,7 @@ This crate provides replay log parsing, turn indexing, snapshots, and a playback
 
 ```toml
 [dependencies]
-kazam-replay = "0.1.0"
+kazam-replay = "0.2.0"
 ```
 
 ### kazam-team

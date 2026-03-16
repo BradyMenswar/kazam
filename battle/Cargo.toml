@@ -1,6 +1,6 @@
 [package]
 name = "kazam-battle"
-version = "0.2.0"
+version = "0.3.0"
 edition.workspace = true
 description = "Battle state tracking and domain types for Pokemon Showdown (experimental)"
 license = "MIT"
@@ -13,7 +13,7 @@ default = []
 serde = ["dep:serde"]
 
 [dependencies]
-kazam-protocol = { version = "0.1.0", path = "../protocol" }
+kazam-protocol = { version = "0.2.0", path = "../protocol" }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
